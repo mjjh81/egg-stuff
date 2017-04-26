@@ -6,8 +6,21 @@ Created on Sat Apr 22 15:22:17 2017
 @author: hans
 """
 import uuid
+import random
 
+
+"""
+*******************************************************************************
+*******************************************************************************
+FARM CLASS TO MANAGE INDIVIDUAL SIMULATIONS
+*******************************************************************************
+*******************************************************************************
+"""
 class Farm(object):
+    """
+    The farm class is used to define the housing structures that the chickens
+    will be processed through
+    """
     def __init__(self,name):
         self.name = name
         
@@ -29,6 +42,15 @@ class Farm(object):
     def getCoop(self):
         return self.coop
     
+
+
+"""
+*******************************************************************************
+*******************************************************************************
+HOUSING CLASSES TO SETUP STRUCTURE FOR CHICKENS TO TRAVEL THROUGH
+*******************************************************************************
+*******************************************************************************
+"""
 
 class House(object):
     """
@@ -100,6 +122,14 @@ class Coop(RaisingHouse):
     
     
     
+"""
+*******************************************************************************
+*******************************************************************************
+CLASSES TO HELP MANAGE CHICKENS TRAVELING THROUGH THE STRUCTURES
+*******************************************************************************
+*******************************************************************************
+"""    
+    
 class Occupancy(object):
     """Occupancy class helps manage the cohorts within each housing
     providing the space occupied by the various cohorts, thus, the 
@@ -128,6 +158,18 @@ class Occupancy(object):
         
 
 class Cohort(object):
+    """
+    Cohort is used to group chickens together and track them acroos the types
+    housing. Each chicken is an item in a dictionary with the uuid acting as
+    the key and the chicken object itself acting as the value
+    
+    Cohorts too have a uuid that used to track them across time and the housing
+    units. The cohorts have a single age for each chicken within it.
+    
+    A cohort is first created with the max size that cohort will be. Afterwards
+    the cohort can only decrease in size according to deathrates and when the
+    chickens are sold.
+    """
     def __init__(self,house):
         self.chickens={}
         self.age=1
@@ -196,7 +238,79 @@ class Cohort(object):
         
     def getHouse(self):
         return self.house
+    
+    
+
+
+
+"""
+*******************************************************************************
+*******************************************************************************
+CLASSES ALL PERTRAINING TO CHICKENS AND THEIR ATTRIBUTES
+*******************************************************************************
+*******************************************************************************
+"""   
+
+    
+class Breed(object):
+    """
+    Breed is the base class for any chicken
+    All breed information is read in from txt files
+    """
+    
+    def __init__(self, name, incubatorTime, incubatorDeathRate, brooderTime,
+                 brooderDeathRate, coopReadyTime, coopReadyDeathRate,
+                 coopDeathRate, lifeTime, eggPrice, sellingPrice):
+        """
+        Initializes a position with coordinates (x, y).
+        """
+        self.name=name
+        self.incubatorTime=incubatorTime
+        self.incubatorDeathRate=incubatorDeathRate
+        self.brooderTime=brooderTime
+        self.brooderDeathRate=brooderDeathRate
+        self.coopReadyTime=coopReadyTime
+        self.coopReadyDeathRate=coopReadyDeathRate
+        self.coopDeathRate=coopDeathRate
+        self.lifeTime=lifeTime
+        self.eggPrice=eggPrice
+        self.sellingPrice=sellingPrice
         
+    @classmethod
+    def dictToBreed(cls,breedDict):
+        return cls(breedDict['name'], breedDict['incubatorTime'],breedDict['incubatorDeathRate'],
+                      breedDict['brooderTime'], breedDict['brooderDeathRate'], 
+                      breedDict['coopReadyTime'], breedDict['coopReadyDeathRate'], 
+                      breedDict['coopDeathRate'], breedDict['lifeTime'],
+                      breedDict['eggPrice'], breedDict['sellingPrice'])
+        
+    @classmethod
+    def dictsToBreed(cls,listOfBreedDicts):
+        listOfBreeds=[]
+        for breedDict in listOfBreedDicts:
+            listOfBreeds.append(Breed.dictToBreed(breedDict))
+        return listOfBreeds
+        
+    """
+    example reading in information...
+    Path=None
+    loaded_breeds=loadBreedFromTxt.load_breeds(Path)
+    breeds=Breed.dictsToBreed(loaded_breeds) 
+    """
+    
+class Chicken(Breed):
+    """
+    each instance of chicken for a specific breed is created once
+    assigned a uuid then added to a cohort to be processed
+    """
+    def __init__(self):
+        self.createUUID()
+        
+    def createUUID(self):
+        self.uuid=uuid.uuid4()
+        
+    def getUUID(self):
+        return self.uuid
     
         
         
