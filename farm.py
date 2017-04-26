@@ -7,6 +7,7 @@ Created on Sat Apr 22 15:22:17 2017
 """
 import uuid
 import random
+import loadBreedFromTxt
 
 
 """
@@ -23,6 +24,12 @@ class Farm(object):
     """
     def __init__(self,name):
         self.name = name
+        self.loadBreeds()
+        
+    def loadBreeds(self):
+        path=None
+        loaded_breeds=loadBreedFromTxt.load_breeds(path)
+        self.breeds=Breed.dictsToBreed(loaded_breeds) 
         
     def setIncubator(self, incubator):
         self.incubator=incubator
