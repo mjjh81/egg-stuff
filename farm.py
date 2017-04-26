@@ -7,7 +7,38 @@ Created on Sat Apr 22 15:22:17 2017
 """
 import uuid
 import random
-import loadBreedFromTxt
+import loadBreedsFromTxt
+
+
+"""
+*******************************************************************************
+*******************************************************************************
+FARM CLASS TO MANAGE INDIVIDUAL SIMULATIONS
+*******************************************************************************
+*******************************************************************************
+"""
+class Simulation(object):
+    """
+    Keeps a dictionary of the farms and batches created so can easily mix and
+    match the two
+    """
+    def __init__(self,name):
+        self.name=name
+        self.farms={}
+        self.batches={}
+        
+    def addFarm(self,farm):
+        self.farms[farm.name]=farm
+    
+    def getFarm(self,farm):
+        return self.farms[farm.name]
+        
+    def addBatch(self,batch):
+        self.batches[batch.name]=batch
+    
+    def getBatch(self,batch):
+        return self.batches[batch.name]
+    
 
 
 """
@@ -28,7 +59,7 @@ class Farm(object):
         
     def loadBreeds(self):
         path=None
-        loaded_breeds=loadBreedFromTxt.load_breeds(path)
+        loaded_breeds=loadBreedsFromTxt.load_breeds(path)
         self.breeds=Breed.dictsToBreed(loaded_breeds) 
         
     def setIncubator(self, incubator):
