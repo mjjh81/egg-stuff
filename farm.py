@@ -8,6 +8,7 @@ Created on Sat Apr 22 15:22:17 2017
 import uuid
 import random
 import loadBreedsFromTxt
+import math
 
 
 """
@@ -117,9 +118,10 @@ class House(object):
     
 class Incubator(House):
     """
-    Incubator has an energy consumption, price, hatch rate factor, size
+    Incubator has an energy consumption, price, hatch rate, size
     """
-    def __init__(self,hatchRate):
+    def __init__(self,hatchRate, size, price, cons):
+        super().__init__(size, price, cons)
         self.hatchRate=hatchRate
         
     def getHatchRate(self):
@@ -278,7 +280,93 @@ class Cohort(object):
         return self.house
     
     
+class Batch(object):
+    def __init__(self, name, farm):
+        self.name=name
+        self.farm=farm
+        self.cohorts={}
+        self.setIncubatorSize()
+        
+    def setIncubatorSize(self):
+        self.incubatorSize=self.farm.getIncubator().size
+        
+    def setBreeds(self,breeds):
+        """
+        breeds is a dictionary with the breeds as the key, and the 
+        proportion of that batch that is the breed as the value
+        
+        the value of the dictionary can either be a % or a integer value
+        representing the number of eggs in that batch of that breed
+        """
+        self.setProportion(breeds)
+        
+    def testPrintCohort(self, breeds):
+        for key in breeds.keys():
+            print("breed name: " + key.name + ", number: " + str(breeds[key]))
+        
+    def setProportion(self, breeds):
+        """
+        sets number of chickens per breed for the batch
+        
+        if only 1 breed then it will take all available space
+        
+        otherwise, a list is created based on descending values
+        -if the largest value is greater than 1 then number of chickens
+        per breed is set by those integer values with 0's in the list
+        evenly splitting the remaining space
+        -if the largest value is between 1 and 0 then number of chickens
+        per breed is set by that proportion*self.incubatorSize with the
+        0's in the list evenly splitting the remaining space
+        
+        both of these methods change the values in the dictionary to 
+        integers that will be used to create the cohorts
+        """
+        self.breeds=breeds
+        if len(breeds) == 1:
+            self.breeds[self.breeds.key()[0]]=self.incubatorSize
+            self.testPrintCohort(self.breeds)
+            ##TODO: add to cohort method
+        else:
+            self.addCohortsWithDescendingValuesList(
+                    sorted(breeds, key=breeds.get, reverse=True), self.incubatorSize)
+                
+    def addCohortsWithDescendingValuesList(self, keysOfDescendingValues, remaining):
+        value=self.breeds[keysOfDescendingValues[0]]
+        if len(keysOfDescendingValues)==1:
+            self.breeds[keysOfDescendingValues[0]]=remaining
+            ##TODO: add to cohort method
+            self.testPrintCohort(self.breeds)
+        elif value < 1 and value >0:
+            self.convertProportionToInteger(keysOfDescendingValues, remaining)
+            
+        elif value > 1:
+            self.addCohortsWithDescendingValuesList(keysOfDescendingValues[1:], remaining-value)
+            
+        elif value == 0:
+            self.convertProportionToInteger(keysOfDescendingValues, remaining)
+            
+    
+    def convertProportionToInteger(self, keysOfDescendingValues, remaining):
+         number=round(self.breeds[keysOfDescendingValues[0]]*self.incubatorSize)
+         delta=remaining-number
+         if len(keysOfDescendingValues) == 1:
+            self.breeds[keysOfDescendingValues.pop(0)]=remaining
+            ##TODO: add to cohort method
+            self.testPrintCohort(self.breeds)
+         elif number == 0:
+            number=round((1/len(keysOfDescendingValues))*remaining)
+            self.breeds[keysOfDescendingValues.pop(0)]=number
+            self.convertProportionToInteger(keysOfDescendingValues, remaining-number)
+         elif delta >= 0:
+            self.breeds[keysOfDescendingValues.pop(0)]=number
+            self.convertProportionToInteger(keysOfDescendingValues,remaining-number)
 
+             
+             
+            
+              
+          
+    
 
 
 """
