@@ -321,21 +321,27 @@ class Batch(object):
         both of these methods change the values in the dictionary to 
         integers that will be used to create the cohorts
         """
-        self.breeds=breeds
-        if len(breeds) == 1:
-            self.breeds[self.breeds.key()[0]]=self.incubatorSize
-            self.testPrintCohort(self.breeds)
-            ##TODO: add to cohort method
-        else:
-            self.addCohortsWithDescendingValuesList(
-                    sorted(breeds, key=breeds.get, reverse=True), self.incubatorSize)
+        helper=ProportionHelper(breeds,self.iincubatorSize)
+        self.breeds=helper.getUpdatedBreeds()
                 
+            
+
+
+class ProportionHelper(object):
+    def __init__(self, breeds, batchSize):
+        if len(breeds)==1:
+            self.breeds[self.breeds.key()[0]]=batchSize
+        else:
+            self.breeds=breeds
+            self.batchSize=batchSize
+            self.keysOfDescendingValues=sorted(breeds, key=breeds.get, reverse=True)
+            self.addCohortsWithDescendingValuesList(self.keysOfDescendingValues,batchSize)             
+          
+        
     def addCohortsWithDescendingValuesList(self, keysOfDescendingValues, remaining):
         value=self.breeds[keysOfDescendingValues[0]]
         if len(keysOfDescendingValues)==1:
             self.breeds[keysOfDescendingValues[0]]=remaining
-            ##TODO: add to cohort method
-            self.testPrintCohort(self.breeds)
         elif value < 1 and value >0:
             self.convertProportionToInteger(keysOfDescendingValues, remaining)
             
@@ -344,15 +350,12 @@ class Batch(object):
             
         elif value == 0:
             self.convertProportionToInteger(keysOfDescendingValues, remaining)
-            
-    
+      
     def convertProportionToInteger(self, keysOfDescendingValues, remaining):
          number=round(self.breeds[keysOfDescendingValues[0]]*self.incubatorSize)
          delta=remaining-number
          if len(keysOfDescendingValues) == 1:
             self.breeds[keysOfDescendingValues.pop(0)]=remaining
-            ##TODO: add to cohort method
-            self.testPrintCohort(self.breeds)
          elif number == 0:
             number=round((1/len(keysOfDescendingValues))*remaining)
             self.breeds[keysOfDescendingValues.pop(0)]=number
@@ -360,11 +363,9 @@ class Batch(object):
          elif delta >= 0:
             self.breeds[keysOfDescendingValues.pop(0)]=number
             self.convertProportionToInteger(keysOfDescendingValues,remaining-number)
-
-             
-             
-            
               
+    def getUpdatedBreeds(self):
+        return self.breeds
           
     
 
