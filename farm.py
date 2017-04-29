@@ -196,6 +196,17 @@ class Occupancy(object):
             return None
         
         
+class CohortHelper(object):
+    
+    def __init__(self, batchBreeds):
+        self.cohortDict={}
+        for batchItem in batchBreeds.items():
+            tempCohort=Cohort(batchItem)
+            self.cohortDict[tempCohort.getUUID()]=tempCohort
+    
+    def getCohortDict(self):
+        return self.cohortDict
+            
 
 class Cohort(object):
     """
@@ -210,12 +221,20 @@ class Cohort(object):
     the cohort can only decrease in size according to deathrates and when the
     chickens are sold.
     """
-    def __init__(self,house):
+    def __init__(self, batchItem = None, house = None):
+        if house is not None:
+            self.house=house
+        if batchItem is not None:
+            self.initializeCohortFromBatchBreed(batchItem)
         self.chickens={}
         self.age=1
-        self.house=house
         self.uuid=uuid.uuid4()
         
+    def initializeCohortFromBatchBreed(self, batchItem):
+        for i in range(0,batchItem[1]):
+            tempChicken=Chicken(batchItem[0])
+            self.chickens[tempChicken.getUUID()]=tempChicken
+    
     def addChicken(self,chicken):
         self.chickens[chicken.getUUID()]=chicken
                       
@@ -279,6 +298,9 @@ class Cohort(object):
     def getHouse(self):
         return self.house
     
+    def getUUID(self):
+        return self.uuid
+    
     
 class Batch(object):
     def __init__(self, name, farm):
@@ -300,10 +322,6 @@ class Batch(object):
         """
         self.setProportion(breeds)
         
-    def testPrintCohort(self, breeds):
-        for key in breeds.keys():
-            print("breed name: " + key.name + ", number: " + str(breeds[key]))
-        
     def setProportion(self, breeds):
         """
         sets number of chickens per breed for the batch
@@ -320,14 +338,36 @@ class Batch(object):
         
         both of these methods change the values in the dictionary to 
         integers that will be used to create the cohorts
+        
+        TODO: setup an option to have a variable batch size
         """
-        helper=ProportionHelper(breeds,self.iincubatorSize)
+        helper=ProportionHelper(self.breeds,self.iincubatorSize)
         self.breeds=helper.getUpdatedBreeds()
+        
+        self.createCohortsFromBatchAmounts()
+        
+    def createCohortsFromBatchAmounts(self):
+        self.cohorts=CohortHelper(self.breeds).getCohortDict()
+            
                 
             
 
 
 class ProportionHelper(object):
+    """
+    Helper class taking in the breeds of the batch along with the predetermined
+    proportions and total size of the batch to determine amounts for each breed
+    
+    The proportions can come as integers, float decimal proportions, or 0's in
+    which case all of the 0's evenly split the remaining space in the batch
+    
+    If there is only 1 breed then it occupies the entire space
+    
+    With 2 or more breeds the keys are sorted in descending order according to
+    their values. The integer values are kept while the float values are
+    replaced with a round number of the float*batchSize. The remaining space
+    is tracked so that the trailing 0's can evenly split the space
+    """
     def __init__(self, breeds, batchSize):
         if len(breeds)==1:
             self.breeds[self.breeds.key()[0]]=batchSize
@@ -335,8 +375,7 @@ class ProportionHelper(object):
             self.breeds=breeds
             self.batchSize=batchSize
             self.keysOfDescendingValues=sorted(breeds, key=breeds.get, reverse=True)
-            self.addCohortsWithDescendingValuesList(self.keysOfDescendingValues,batchSize)             
-          
+            self.addCohortsWithDescendingValuesList(self.keysOfDescendingValues,batchSize)                    
         
     def addCohortsWithDescendingValuesList(self, keysOfDescendingValues, remaining):
         value=self.breeds[keysOfDescendingValues[0]]
@@ -352,7 +391,7 @@ class ProportionHelper(object):
             self.convertProportionToInteger(keysOfDescendingValues, remaining)
       
     def convertProportionToInteger(self, keysOfDescendingValues, remaining):
-         number=round(self.breeds[keysOfDescendingValues[0]]*self.incubatorSize)
+         number=round(self.breeds[keysOfDescendingValues[0]]*self.batchSize)
          delta=remaining-number
          if len(keysOfDescendingValues) == 1:
             self.breeds[keysOfDescendingValues.pop(0)]=remaining
@@ -367,7 +406,9 @@ class ProportionHelper(object):
     def getUpdatedBreeds(self):
         return self.breeds
           
-    
+    def testPrintCohort(self, breeds):
+        for key in breeds.keys():
+            print("breed name: " + key.name + ", number: " + str(breeds[key]))    
 
 
 """
@@ -425,12 +466,13 @@ class Breed(object):
     breeds=Breed.dictsToBreed(loaded_breeds) 
     """
     
-class Chicken(Breed):
+class Chicken(object):
     """
     each instance of chicken for a specific breed is created once
     assigned a uuid then added to a cohort to be processed
     """
-    def __init__(self):
+    def __init__(self, breed):
+        self.breed=breed
         self.createUUID()
         
     def createUUID(self):
