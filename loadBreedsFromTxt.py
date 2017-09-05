@@ -16,7 +16,7 @@ breed_path=os.getcwd()+'/breeds'
 incubator_path=os.getcwd()+'/incubator'
 brooder_path=os.getcwd()+'/brooder'
 coop_path=os.getcwd()+'/coop'
-farm_path=os.getcwd()+'/farm'
+farm_path=os.getcwd()+'/farm_parms'
 ignoreTheseFiles=['.DS_Store']
 
 def loadFromPath(path):
@@ -37,6 +37,7 @@ def loadCoops():
 
 def loadFarms():
     return loadFromPath(farm_path)
+
 
 class LoadFilesFromTuples(object):
     def __init__(self, fileTuples=None):
