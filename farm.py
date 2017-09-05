@@ -31,51 +31,96 @@ class Simulation(object):
     """
     def __init__(self,name):
         self.name=name
-        self.farms={}
-        self.batches={}
         self.loadBreeds()
         self.loadIncubators()
         self.loadBrooders()
         self.loadCoops()
-        self.loadFarmss()
+        self.loadFarmParms()
+        
+        self.addFarm()
         
     def loadBreeds(self):
         loaded_breeds=loadTxtFile.loadBreeds()
         self.breeds=Breed.dictsToBreed(loaded_breeds) 
         
     def loadIncubators(self):
-        loaded_incubators=loadTxtFile.loadIncubator()
+        loaded_incubators=loadTxtFile.loadIncubators()
         self.incubators=Incubator.dictsToIncubator(loaded_incubators)
         
     def loadBrooders(self):
-        loaded_brooders=loadTxtFile.loadBrooder()
+        loaded_brooders=loadTxtFile.loadBrooders()
         self.brooders=Brooder.dictsToBrooder(loaded_brooders)
         
     def loadCoops(self):
-        loaded_coops=loadTxtFile.loadCoop()
+        loaded_coops=loadTxtFile.loadCoops()
         self.coops=Coop.dictsToCoop(loaded_coops)
         
-    def getIncubator(self):
-        return self.incubator
+    def loadFarmParms(self):
+        loaded_farm_parms=loadTxtFile.loadFarms()
+        self.farm_parms=FarmParm.dictsToFarmParm(loaded_farm_parms)
         
-    def getCoop(self):
-        return self.coop
+    def addMCV(self,name):
+        root = tk.Tk()
+        self.view = Application(master=root)
+        self.model = GUIModel()
         
-    def addFarm(self,farm):
-        self.farms[farm.name]=farm
-    
-    def getFarm(self,farm):
-        return self.farms[farm.name]
-    
-    def getFarmsDict(self):
-        return self.farms
+        self.controller = GUIController(self.model, self.view)
+        self.controller.registerSim(self)
+        self.controller.upload_to_model(self.breeds, self.incubators,
+                                        self.brooders, self.coops, 
+                                        self.farm_parms)
         
-    def addBatch(self,batch):
-        self.batches[batch.name]=batch
+    """
+    checks if the request has all fo the necessary information to build
+    a "farm" and start the simulation process. Once the simulation has
+    occured then all information is sent back to the controller to be
+    displayed to the user
+    """    
+    def receiveRequestFromController(self,request):
+        """
+        checking for infomration of request if it checks out then
+        create farm and start sim
+        """
+        
+    """add 'request' to method as to come from GUI"""
+    def addFarm(self):
+        #farm name
+        name = "test farm"
+        #breed
+        breed = self.breeds[0]
+        #starting number of chickens
+        starting_number = 12
+        #age of chickens
+        starting_age = 20
+        #incubator
+        incubator = self.incubators[0]
+        #brooder
+        brooder = self.brooders[0]
+        #coop
+        coop = self.coops[0]
+        #farm parameters
+        farm_parm = self.farm_parms[0]
+        #sales strategy
+            #eggs 0
+            #meat 1
+            #chicks 2
+        sales = 2      
+        #time to run simulation
+        sim_time = 365
+        
+        farm = Farm(name, breed, starting_number, starting_age, incubator, brooder, coop,
+                    farm_parm, sales, sim_time)
+        
+        self.farm=farm
+        
+        
+    def getIncubators(self):
+        return self.incubators
+        
+    def getCoops(self):
+        return self.coops
     
-    def getBatch(self,batch):
-        return self.batches[batch.name]
-    
+
 
 
 """
@@ -90,48 +135,215 @@ class Farm(object):
     The farm class is used to define the housing structures that the chickens
     will be processed through
     """
-    def __init__(self,name):
+    def __init__(self, name, breed, starting_number, starting_age, incubator, brooder, coop,
+                    farm_parm, sales, sim_time):
         self.name = name
-        self.loadBreeds()
-        self.loadIncubator()
-        self.loadBrooder()
-        self.loadCoop()
+        self.breed = breed
+        self.starting_number = starting_number
+        self.starting_age = starting_age 
+        self.incubator = incubator
+        self.brooder = brooder
+        self.coop = coop
+        self.farm_parm = farm_parm
+        self.sales = sales
+        self.sim_time = sim_time
+        self.chickens={}
+        self.day=0
         
-    def loadBreeds(self):
-        loaded_breeds=loadTxtFile.loadBreeds()
-        self.breeds=Breed.dictsToBreed(loaded_breeds) 
+        self.dead = Dead("testDeath",100000000)
+        self.setDeathRates()
         
-    def loadIncubator(self):
-        loaded_incubator=loadTxtFile.loadIncubator()
-        self.setIncubator(Incubator.dictToIncubator(loaded_incubator[0]))
+        self.sold = Sold("testSold",100000000)
         
-    def loadBrooder(self):
-        loaded_brooder=loadTxtFile.loadBrooder()
-        self.setBrooder(Brooder.dictToBrooder(loaded_brooder[0]))
+        self.eggBasket = EggBasket("testBasket",100000)
         
-    def loadCoop(self):
-        loaded_coop=loadTxtFile.loadCoop()
-        self.setCoop(Coop.dictToCoop(loaded_coop[0]))
-        
-    def setIncubator(self, incubator):
-        self.incubator=incubator
-        
-    def getIncubator(self):
-        return self.incubator
-    
-    def setBrooder(self, brooder):
-        self.brooder=brooder
-        
-    def getBrooder(self):
-        return self.brooder
-    
-    def setCoop(self, coop):
-        self.coop=coop
-        
-    def getCoop(self):
-        return self.coop
-    
+        self.account=Accounting(self)
 
+        self.createStartingCohort()
+        
+    def setDeathRates(self):
+        self.deathRates = {}
+        
+        self.deathRates["Incubator"] = math.pow(self.breed.incubatorDeathRate,
+                                                (1/self.breed.incubatorTime))
+        self.deathRates["Brooder"] = math.pow(self.breed.brooderDeathRate,
+                                              (1/self.breed.brooderTime))
+        self.deathRates["CoopReady"] = math.pow(self.breed.coopReadyDeathRate,
+                                                (1/self.breed.coopReadyTime))
+        self.deathRates["Coop"] = math.pow(self.breed.coopDeathRate,
+                                          (1/(self.breed.lifeTime-self.breed.brooderTime-
+                                              self.breed.coopReadyTime)))
+        self.deathRates["Sold"] = None
+        self.deathRates["Dead"] = None
+                      
+        
+    def createStartingCohort(self):
+        numberOfMales=math.ceil((1/self.breed.maleToFemaleRatio)*self.starting_number)
+        maleCount=0
+        
+        for number in range(0,self.starting_number):
+            chicken=Chicken(self.breed,self.day-self.starting_age)
+            chicken.setLocationByAge(self.starting_age,self.incubator,self.brooder,
+                                     self.coop, self.dead)
+            if maleCount<numberOfMales:
+                chicken.setSex(1)
+                maleCount+=1
+            else:
+                chicken.setSex(0)
+            self.chickens[chicken.getUUID()]=chicken
+                          
+        self.updateChickensLocationLog()
+        self.dailyHappenings()
+        
+    def updateChickensLocationLog(self):
+        for chicken in self.chickens.values():
+            self.updateChickenLocationLog(chicken.updateLocationLog(self.day))
+            
+    def updateChickenLocationLog(self, chicken):
+        chicken.updateLocationLog(self.day)
+        
+    def dailyHappenings(self):
+        
+        for chicken in self.chickens.values():
+            sex=chicken.getSex()
+            self.dailyDeath(chicken)
+            self.dailyFeeding(chicken, sex)
+            self.dailyLaying()
+            
+            #Vaccinating
+            #TODO: add in vaccines and effect on death rate
+            
+        ##Sales specific management
+        if self.sales=="Eggs":
+            print("")
+        elif self.sales=="Chicks":
+            print("")
+        elif self.sales=="Meat":
+            print("")
+
+
+        #Update day then go to next
+        
+    def dailyDeath(self, chicken):
+        deathRate = self.deathRates[chicken.getLocationName()]
+        print(deathRate)
+        if type(deathRate) is float:
+            if random.random() > deathRate:
+                chicken.transferLocation("Dead",self.dead,self.day)
+                print('chicken died')
+                    
+    def dailyFeeding(self, chicken, sex):
+        locationName=chicken.getLocationName()
+        if locationName == "Brooder":
+            expense=self.breed.dailyStarterFood*self.farm_parm.foodStarterPrice
+            self.account.expeneses.addExpense(expense, 'food', self.day)
+            print("")
+        elif locationName == "CoopReady":
+            if sex == 0:
+                expense=self.breed.dailyGrowerFood*self.farm_parm.foodGrowerPrice
+                self.account.expeneses.addExpense(expense, 'food', self.day)
+                print("")
+            else:
+                expense=self.breed.dailyHenFood*self.farm_parm.foodHenPrice
+                self.account.expeneses.addExpense(expense, 'food', self.day)
+                print("")
+        elif locationName == "Coop":
+            if sex == 0:
+                expense=self.breed.dailyMashFood*self.farm_parm.foodMashPrice
+                self.account.expeneses.addExpense(expense, 'food', self.day)
+                print("")
+            else:
+                expense=self.breed.dailyHenFood*self.farm_parm.foodHenPrice
+                self.account.expeneses.addExpense(expense, 'food', self.day)
+                print("")
+                    
+    def dailyLaying(self, chicken, sex):
+        if sex == 0:
+            if chicken.getLocationName() == "Coop":
+                if random.random() < (self.breed.eggProductionRate/365):
+                    #TODO: add in fertility probability
+                    egg=Chicken(self.breed,None)
+                    egg.setLocationName("EggBasket")
+                    self.chickens[egg.getUUID()]=egg
+    
+    
+    def eggSalesManagement(self):
+                            
+            
+                    
+
+
+            
+                
+        
+        
+        
+        
+#    def loadBreeds(self):
+#        loaded_breeds=loadTxtFile.loadBreeds()
+#        self.breeds=Breed.dictsToBreed(loaded_breeds) 
+#        
+#    def loadIncubator(self):
+#        loaded_incubator=loadTxtFile.loadIncubator()
+#        self.setIncubator(Incubator.dictToIncubator(loaded_incubator[0]))
+#        
+#    def loadBrooder(self):
+#        loaded_brooder=loadTxtFile.loadBrooder()
+#        self.setBrooder(Brooder.dictToBrooder(loaded_brooder[0]))
+#        
+#    def loadCoop(self):
+#        loaded_coop=loadTxtFile.loadCoop()
+#        self.setCoop(Coop.dictToCoop(loaded_coop[0]))
+#        
+#    def setIncubator(self, incubator):
+#        self.incubator=incubator
+#        
+#    def getIncubator(self):
+#        return self.incubator
+#    
+#    def setBrooder(self, brooder):
+#        self.brooder=brooder
+#        
+#    def getBrooder(self):
+#        return self.brooder
+#    
+#    def setCoop(self, coop):
+#        self.coop=coop
+#        
+#    def getCoop(self):
+#        return self.coop
+    
+class Accounting(object):
+    def __init__(self,farm):
+        self.farm=farm
+        self.revenues=Revenues(self)
+        self.expeneses=Expenses(self)
+        
+
+class Revenues(object):
+    def __init__(self, account):
+        self.account=account
+        self.revenues={}
+        
+    def addRevenue(self, amount, source, day):
+        try:
+            self.revenues[day].append(amount,source)
+        except KeyError:
+            self.revenues[day]=[(amount,source)]
+            
+class Expenses(object):
+    def __init__(self, account):
+        self.account=account
+        self.expenses={}
+        
+    def addExpense(self, amount, source, day):
+        try:
+            self.expenses[day].append(amount,source)
+        except KeyError:
+            self.expenses[day]=[(amount,source)]
+            
+    
+        
 
 """
 *******************************************************************************
@@ -160,9 +372,19 @@ class House(object):
     
     def getSize(self):
         return self.size    
+    
+    
+class Dead(House):
+    def __init__(self,name, size):
+        super().__init__(name, size)
+        
+class Sold(House):
+    def __init__(self, name, size):
+        super().__init__(name, size)
             
-    
-    
+class EggBasket(House):
+    def __init__(self,name,size):
+        super().__init__(name, size)
     
 class Incubator(House):
     """
@@ -178,10 +400,16 @@ class Incubator(House):
                    incubatorDict['size'],incubatorDict['price'],
                    incubatorDict['cons'])
         
+    @classmethod
+    def dictsToIncubator(cls,listOfIncubatorDicts):
+        listOfIncubators=[]
+        for incubatorDict in listOfIncubatorDicts:
+            listOfIncubators.append(Incubator.dictToIncubator(incubatorDict))
+        return listOfIncubators
+        
     def getHatchRate(self):
         return self.hatchRate
     
-
     
     
 class RaisingHouse(House):
@@ -209,6 +437,13 @@ class Brooder(RaisingHouse):
                    brooderDict['name'],brooderDict['size'],brooderDict['price'],
                    brooderDict['cons'])
         
+    @classmethod
+    def dictsToBrooder(cls,listOfBrooderDicts):
+        listOfBrooders=[]
+        for brooderDict in listOfBrooderDicts:
+            listOfBrooders.append(Brooder.dictToBrooder(brooderDict))
+        return listOfBrooders
+        
 class Coop(RaisingHouse):
     """
     Coops are where chickens are placed after brooders and where they preside
@@ -224,9 +459,42 @@ class Coop(RaisingHouse):
                    coopDict['name'],coopDict['size'],coopDict['price'],
                    coopDict['cons'])
         
-    def setLighting(self,light):
-        self.light=light    
+    @classmethod
+    def dictsToCoop(cls,listOfCoopDicts):
+        listOfCoops=[]
+        for coopDict in listOfCoopDicts:
+            listOfCoops.append(Coop.dictToCoop(coopDict))
+        return listOfCoops
     
+    def setLighting(self,light):
+        self.light=light   
+        
+    
+class FarmParm(object):
+    def __init__(self, marketDemandEggs, marketDemandChicks, marketDemandMeat,
+                 foodStarterPrice, foodGrowerPrice, foodMashPrice,
+                 foodHenPrice):
+        self.marketDemandEggs=marketDemandEggs
+        self.marketDemandChicks=marketDemandChicks
+        self.marketDemandMeat=marketDemandMeat
+        self.foodStarterPrice=foodStarterPrice
+        self.foodGrowerPrice=foodGrowerPrice
+        self.foodMashPrice=foodMashPrice
+        self.foodHenPrice=foodHenPrice
+        
+    @classmethod
+    def dictToFarmParm(cls,farmParmDict):
+        return cls(farmParmDict['marketDemandEggs'], farmParmDict['marketDemandChicks'],
+                   farmParmDict['marketDemandMeat'], farmParmDict['foodStarterPrice'],
+                   farmParmDict['foodGrowerPrice'], farmParmDict['foodMashPrice'],
+                   farmParmDict['foodHenPrice'])
+        
+    @classmethod
+    def dictsToFarmParm(cls,listOfFarmParmDicts):
+        listOfFarmParms=[]
+        for farmParmDict in listOfFarmParmDicts:
+            listOfFarmParms.append(FarmParm.dictToFarmParm(farmParmDict))
+        return listOfFarmParms
     
     
     
@@ -501,31 +769,36 @@ class Breed(object):
                  coopDeathRate, lifeTime, eggPrice, sellingPrice, eggCost,
                  chickPrice, maleToFemaleRatio, fertilityRate, eggProductionRate,
                  sellingFertilePrice, sellingSexed, sexedAge, brooderSpace,
-                 kibandaSpace):
+                 kibandaSpace,dailyStarterFood,dailyGrowerFood,dailyMashFood,
+                 dailyHenFood):
         """
         Initializes a position with coordinates (x, y).
         """
         self.name=name
-        self.incubatorTime=incubatorTime
-        self.incubatorDeathRate=incubatorDeathRate
-        self.brooderTime=brooderTime
-        self.brooderDeathRate=brooderDeathRate
-        self.coopReadyTime=coopReadyTime
-        self.coopReadyDeathRate=coopReadyDeathRate
-        self.coopDeathRate=coopDeathRate
-        self.lifeTime=lifeTime
-        self.eggPrice=eggPrice
-        self.sellingPrice=sellingPrice
-        self.eggCost=eggCost
-        self.chickPrice=chickPrice
-        self.maleToFemaleRatio=maleToFemaleRatio
-        self.fertilityRate=fertilityRate
-        self.eggProductionRate=eggProductionRate
-        self.sellingFertilePrice=sellingFertilePrice
-        self.sellingSexed=sellingSexed
-        self.sexedAge=sexedAge
-        self.brooderSpace=brooderSpace
-        self.kibandaSpace=kibandaSpace
+        self.incubatorTime=float(incubatorTime)
+        self.incubatorDeathRate=float(incubatorDeathRate)
+        self.brooderTime=float(brooderTime)
+        self.brooderDeathRate=float(brooderDeathRate)
+        self.coopReadyTime=float(coopReadyTime)
+        self.coopReadyDeathRate=float(coopReadyDeathRate)
+        self.coopDeathRate=float(coopDeathRate)
+        self.lifeTime=float(lifeTime)
+        self.eggPrice=float(eggPrice)
+        self.sellingPrice=float(sellingPrice)
+        self.eggCost=float(eggCost)
+        self.chickPrice=float(chickPrice)
+        self.maleToFemaleRatio=float(maleToFemaleRatio)
+        self.fertilityRate=float(fertilityRate)
+        self.eggProductionRate=float(eggProductionRate)
+        self.sellingFertilePrice=float(sellingFertilePrice)
+        self.sellingSexed=float(sellingSexed)
+        self.sexedAge=float(sexedAge)
+        self.brooderSpace=float(brooderSpace)
+        self.kibandaSpace=float(kibandaSpace)
+        self.dailyStarterFood=float(dailyStarterFood)
+        self.dailyGrowerFood=float(dailyGrowerFood)
+        self.dailyMashFood=float(dailyMashFood)
+        self.dailyHenFood=float(dailyHenFood)
         
         
     @classmethod
@@ -539,7 +812,9 @@ class Breed(object):
                       breedDict['maleToFemaleRatio'], breedDict['fertilityRate'],
                       breedDict['eggProductionRate'], breedDict['sellingFertilePrice'],
                       breedDict['sellingSexed'], breedDict['sexedAge'],
-                      breedDict['brooderSpace'], breedDict['kibandaSpace'])
+                      breedDict['brooderSpace'], breedDict['kibandaSpace'],
+                      breedDict['dailyStarterFood'], breedDict['dailyGrowerFood'],
+                      breedDict['dailyMashFood'], breedDict['dailyHenFood'])
         
     @classmethod
     def dictsToBreed(cls,listOfBreedDicts):
@@ -560,15 +835,78 @@ class Chicken(object):
     each instance of chicken for a specific breed is created once
     assigned a uuid then added to a cohort to be processed
     """
-    def __init__(self, breed):
+    def __init__(self, breed, birthday):
         self.breed=breed
+        self.birthday=birthday
         self.createUUID()
+        self.locationByDay={}
         
     def createUUID(self):
         self.uuid=uuid.uuid4()
         
+    def setSex(self,sex):
+        #female: 0, male: 1
+        self.sex=sex
+        
+    def getSex(self):
+        return self.sex
+        
     def getUUID(self):
         return self.uuid
+    
+    def setLocation(self, location):
+        self.location=location
+        
+    def setLocationName(self, name):
+        self.locationName=name
+        
+    def getLocation(self):
+        return self.location
+    
+    def getLocationName(self):
+        return self.locationName
+    
+    def getBirthday(self):
+        return self.birthday
+    
+    def setLocationByAge(self, day, incubator, brooder, coop, dead):
+        age = day - self.birthday
+        if age < self.breed.incubatorTime:
+            self.locationName="Incubator"
+            self.location=incubator
+        elif age < (self.breed.brooderTime + self.breed.incubatorTime):
+            self.locationName="Brooder"
+            self.location=Brooder
+        elif age < (self.breed.coopReadyTime + self.breed.brooderTime + 
+                    self.breed.incubatorTime):
+            self.locationName="CoopReady"
+            self.location=coop
+        elif age < (self.lifeTime - self.breed.incubatorTime):
+            self.locationName="Coop"
+            self.location=coop
+        else:
+            self.locationName="Dead"
+            self.location=dead
+        
+        self.updateLocationLog(day)
+        
+    def updateLocationLog(self,currentDay):
+        if currentDay == 0:
+            self.locationByDay[currentDay]=(self.location,self.locationName)
+        else:
+            try:
+                if self.location[currentDay-1] is not None:
+                    self.locationByDay[currentDay]=(self.location,self.locationName)
+            except KeyError:
+                self.locationByDay[currentDay]=(self.location,self.locationName)
+                self.updateLocationLog(currentDay-1)
+                
+            
+    def transferLocation(self,locationName, location, day):
+        self.locationName=locationName
+        self.location=location
+        self.updateLocationLog(day)
+        
     
 
 """
@@ -594,6 +932,9 @@ class GUIController(object):
         self.view=view
         
         self.view.register(self)
+        
+    def registerSim(self,sim):
+        self.sim=sim
         
     def upload_to_model(self):
         for breed in farm.breeds:
@@ -740,7 +1081,10 @@ class Application(tk.Frame):
         self.welcome=Welcome(self.root)
         self.welcome.continue_button.bind("<Button>",self.continue_from_welcome)
         self.welcome.quit_button.bind("<Button>",self.quit_from_welcome)
-        ##self.create_widgets()\        
+        ##self.create_widgets()\   
+        
+    def register(self,controller):
+        self.controller=controller
         
     def continue_from_welcome(self, event):
         self.welcome.welcome_label.destroy()
